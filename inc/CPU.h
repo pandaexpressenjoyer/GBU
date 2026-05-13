@@ -10,7 +10,6 @@
 #define TMA 0xFF06
 #define TAC 0xFF07
 
-
 class CPU{
     public:
         CPU(Memory& mem);
@@ -20,7 +19,6 @@ class CPU{
         void updateTimers(int cycles);
         void requestInterrupt(int interruptBit);
         void handleInterrupts();
-        int step();
         
     private:
         Memory& memory;
@@ -64,6 +62,9 @@ class CPU{
         void setFlags(bool z, bool n, bool h, bool c);
         uint8_t fetchByte();
         uint16_t fetchWord();
+        
+        int executeOpcode(uint8_t opcode); 
+        int executeCB(uint8_t cbOpcode); // <--- Added CB declaration
 };
 
 #endif

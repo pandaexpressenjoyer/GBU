@@ -4,7 +4,8 @@
 
 using namespace std;
 
-Memory::Memory(){
+// The Fix: Initializer list binds the 'ctrl' parameter to the 'controller' reference
+Memory::Memory(Controller& ctrl) : controller(ctrl) {
     data.fill(0);
     rom.fill(0);
 }
@@ -32,6 +33,9 @@ void Memory::write(uint16_t address, uint8_t value){
 }
 
 uint8_t Memory::readIO(uint16_t address) const{
+    // Once you're ready to wire up the joypad, you'll un-comment this:
+    // if (address == 0xFF00) return controller.read();
+    
     return data[address];
 }
 
@@ -39,5 +43,9 @@ void Memory::writeIO(uint16_t address, uint8_t value){
     if (address == 0xFF01) {
         printf("%c", value);
     }
+    
+    // Once you're ready to wire up the joypad, you'll un-comment this:
+    // if (address == 0xFF00) { controller.write(value); return; }
+    
     data[address] = value;
 }
