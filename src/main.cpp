@@ -1,5 +1,5 @@
 #include <iostream>
-#include <SDL2/SDL.h> // Adjust this include path if your Mac setup requires just <SDL.h>
+#include <SDL2/SDL.h> 
 
 #include "Controller.h"
 #include "Memory.h"
