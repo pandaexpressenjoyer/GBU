@@ -11,11 +11,19 @@ public:
     
     void step(int cycles);
 
-    // The screen buffer (160 width * 144 height)
     std::array<uint32_t, 160 * 144> frameBuffer{};
-    
-    // Flag to tell main.cpp to draw the screen
     bool frameReady = false; 
+
+    // The classic Game Boy color palette stays!
+    const uint32_t colors[4] = {
+        0xFFE0F8D0, // White
+        0xFF88C070, // Light Gray
+        0xFF346856, // Dark Gray
+        0xFF081820  // Black
+    };
+
+    // Upgraded to accept a VRAM memory address
+    void drawTile(uint16_t tileAddress, int startX, int startY);
 
 private:
     Memory& memory;

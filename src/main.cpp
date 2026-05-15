@@ -12,7 +12,7 @@ const int GB_HEIGHT = 144;
 const int SCALE = 4; // Scale the window 4x so it's easily visible
 
 int main(int argc, char* argv[]) {
-    // 1. Initialize Hardware Bus (Bottom-up dependency)
+    // 1. Initialize Hardware Bus
     Controller joypad;
     Memory bus(joypad);
     CPU cpu(bus);
@@ -93,8 +93,9 @@ int main(int argc, char* argv[]) {
         // Step the CPU and get how many clock cycles the instruction took
         int cycles = cpu.step();
         
-        // Step the PPU to keep it in sync with the CPU
+        // Step the PPU and Timers to keep them in sync with the CPU
         ppu.step(cycles);
+        bus.timer.step(cycles); // <-- ADDED: Step the hardware timers
 
         // --- Graphics Rendering ---
         // Only draw to the screen if the PPU has finished a full frame (VBlank)

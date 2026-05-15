@@ -1,5 +1,4 @@
 #include "PPU.h"
-#include <cstdlib> // Added for rand()
 
 PPU::PPU(Memory& mem) : memory(mem) {}
 
@@ -14,22 +13,13 @@ void PPU::step(int cycles) {
         memory.write(0xFF44, currentScanline); 
 
         if (currentScanline == 144) {
-            // We entered VBlank! Request CPU Interrupt Bit 0.
             requestVBlankInterrupt(); 
 
-            // --- TEMPORARY: GENERATE STATIC NOISE ---
-            // Fill the frame buffer with random grayscale values
-            for (int i = 0; i < 160 * 144; ++i) {
-                uint8_t noise = rand() % 256;
-                // Format is ARGB (0xAARRGGBB). Alpha must be 0xFF (fully opaque).
-                frameBuffer[i] = 0xFF000000 | (noise << 16) | (noise << 8) | noise;
-            }
-            
-            // Tell the main loop it is time to render!
+            // In the final emulator, the screen is already fully drawn by the 
+            // time we hit VBlank. We just tell main.cpp to push it to SDL!
             frameReady = true; 
 
         } else if (currentScanline > 153) {
-            // Back to the top of the screen
             currentScanline = 0;
             memory.write(0xFF44, 0);
         }
@@ -37,15 +27,12 @@ void PPU::step(int cycles) {
 
     // --- State Machine ---
     if (currentScanline >= 144) {
-        setMode(1); // Mode 1: VBlank
+        setMode(1); 
     } else {
-        if (scanlineCounter < 80) {
-            setMode(2); // Mode 2: OAM Search (Sprites)
-        } else if (scanlineCounter < 252) {
-            setMode(3); // Mode 3: Pixel Transfer
-        } else {
-            setMode(0); // Mode 0: HBlank
-        }
+        if (scanlineCounter < 80) setMode(2); 
+        // Later, we will put the actual scanline drawing logic inside Mode 3 here!
+        else if (scanlineCounter < 252) setMode(3); 
+        else setMode(0); 
     }
 }
 
@@ -57,5 +44,34 @@ void PPU::setMode(uint8_t mode) {
 
 void PPU::requestVBlankInterrupt() {
     uint8_t flag = memory.read(0xFF0F);
-    memory.write(0xFF0F, flag | 0x01); // Set bit 0
+    memory.write(0xFF0F, flag | 0x01);
+}
+
+// --- THE UPGRADED TILE DECODER ---
+void PPU::drawTile(uint16_t tileAddress, int startX, int startY) {
+    for (int row = 0; row < 8; row++) {
+        
+        // Calculate the memory address for this specific row (2 bytes per row)
+        uint16_t rowAddress = tileAddress + (row * 2);
+        
+        // Read the actual Game Boy VRAM memory instead of the hardcoded array!
+        uint8_t byte1 = memory.read(rowAddress);     
+        uint8_t byte2 = memory.read(rowAddress + 1); 
+        
+        for (int pixel = 0; pixel < 8; pixel++) {
+            int bitIndex = 7 - pixel;
+            
+            uint8_t lowerBit = (byte1 >> bitIndex) & 0x01;
+            uint8_t upperBit = (byte2 >> bitIndex) & 0x01;
+            
+            uint8_t colorId = (upperBit << 1) | lowerBit;
+            
+            int bufferX = startX + pixel;
+            int bufferY = startY + row;
+            
+            if (bufferX >= 0 && bufferX < 160 && bufferY >= 0 && bufferY < 144) {
+                frameBuffer[(bufferY * 160) + bufferX] = colors[colorId];
+            }
+        }
+    }
 }
