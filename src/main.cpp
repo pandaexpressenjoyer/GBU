@@ -1,5 +1,5 @@
 #include <iostream>
-#include <SDL2/SDL.h> 
+#include <SDL2/SDL.h>
 
 #include "Controller.h"
 #include "Memory.h"
@@ -9,22 +9,24 @@
 // Game Boy Native Resolution
 const int GB_WIDTH = 160;
 const int GB_HEIGHT = 144;
-const int SCALE = 4; // Scale the window 4x so it's visible on modern screens
+const int SCALE = 4; // Scale the window 4x so it's easily visible
 
 int main(int argc, char* argv[]) {
-    // 1. Initialize Hardware Bus
+    // 1. Initialize Hardware Bus (Bottom-up dependency)
     Controller joypad;
     Memory bus(joypad);
     CPU cpu(bus);
     PPU ppu(bus);
 
-    // Load ROM (replace with your path)
+    // 2. Load the test ROM
+    // Make sure 'cpu_instrs.gb' is in the same directory as your executable
     if (!bus.load("cpu_instrs.gb")) {
-        std::cerr << "Failed to load ROM!" << std::endl;
+        std::cerr << "Failed to load ROM! Check the file path." << std::endl;
         return 1;
     }
+    std::cout << "ROM loaded successfully. Booting Emulator..." << std::endl;
 
-    // 2. Initialize SDL2
+    // 3. Initialize SDL2
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         std::cerr << "SDL could not initialize! SDL_Error: " << SDL_GetError() << std::endl;
         return 1;
@@ -45,7 +47,7 @@ int main(int argc, char* argv[]) {
 
     SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
     
-    // The texture acts as our frame buffer. We will eventually write pixel data to this.
+    // The texture acts as our frame buffer. We write pixel data here.
     SDL_Texture* texture = SDL_CreateTexture(
         renderer, 
         SDL_PIXELFORMAT_ARGB8888, 
@@ -53,10 +55,7 @@ int main(int argc, char* argv[]) {
         GB_WIDTH, GB_HEIGHT
     );
 
-    // A temporary array to hold our pixel colors (0xAARRGGBB)
-    uint32_t screenPixels[GB_WIDTH * GB_HEIGHT] = {0};
-
-    // 3. The Main Game Loop
+    // 4. The Main Game Loop
     bool isRunning = true;
     SDL_Event event;
 
@@ -70,7 +69,6 @@ int main(int argc, char* argv[]) {
                 bool isPressed = (event.type == SDL_KEYDOWN);
                 
                 // Map keyboard keys to Game Boy buttons
-                // Bit mapping based on your Controller class:
                 // 0: Right, 1: Left, 2: Up, 3: Down | 4: A, 5: B, 6: Select, 7: Start
                 int button = -1;
                 switch (event.key.keysym.sym) {
@@ -92,28 +90,31 @@ int main(int argc, char* argv[]) {
         }
 
         // --- Hardware Stepping ---
-        // Normally, you would run a loop here to execute enough CPU cycles 
-        // to equal one frame (~70,224 clock cycles per frame).
-        // For now, we will just step it once per loop so it doesn't hang.
+        // Step the CPU and get how many clock cycles the instruction took
         int cycles = cpu.step();
+        
+        // Step the PPU to keep it in sync with the CPU
         ppu.step(cycles);
 
         // --- Graphics Rendering ---
-        // (Eventually, your PPU will fill screenPixels with actual game data)
-        
-        // Update the texture with our pixel array
-        SDL_UpdateTexture(texture, nullptr, screenPixels, GB_WIDTH * sizeof(uint32_t));
-        
-        // Clear screen, copy texture, and present it
-        SDL_RenderClear(renderer);
-        SDL_RenderCopy(renderer, texture, nullptr, nullptr);
-        SDL_RenderPresent(renderer);
-        
-        // Cap the frame rate roughly to 60fps (~16ms per frame)
-        SDL_Delay(16); 
+        // Only draw to the screen if the PPU has finished a full frame (VBlank)
+        if (ppu.frameReady) {
+            ppu.frameReady = false; // Reset the flag
+            
+            // 1. Copy the PPU's frameBuffer into the SDL Texture
+            SDL_UpdateTexture(texture, nullptr, ppu.frameBuffer.data(), GB_WIDTH * sizeof(uint32_t));
+            
+            // 2. Clear the renderer, copy the texture over, and present it to the window
+            SDL_RenderClear(renderer);
+            SDL_RenderCopy(renderer, texture, nullptr, nullptr);
+            SDL_RenderPresent(renderer);
+            
+            // 3. Cap the frame rate roughly to 60fps (~16ms per frame)
+            SDL_Delay(16); 
+        }
     }
 
-    // 4. Cleanup
+    // 5. Cleanup
     SDL_DestroyTexture(texture);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);

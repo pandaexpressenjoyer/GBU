@@ -1,26 +1,34 @@
 #include "PPU.h"
+#include <cstdlib> // Added for rand()
 
-PPU::PPU(Memory& mem) : memory(mem){}
+PPU::PPU(Memory& mem) : memory(mem) {}
 
-void PPU::step(int cycles){
+void PPU::step(int cycles) {
     scanlineCounter += cycles;
-
-    uint8_t stat = memory.read(0xFF41); // LCD Status Register
+    uint8_t stat = memory.read(0xFF41); 
     uint8_t currentMode = stat & 0x03;
-
-    // Scanline length is 456 CPU clock cycles
-    if (scanlineCounter >= 456){
+    
+    if (scanlineCounter >= 456) {
         scanlineCounter -= 456;
-
         currentScanline++;
+        memory.write(0xFF44, currentScanline); 
 
-        memory.write(0xFF44, currentScanline); // LY Register (Current Scanline)
-
-        if (currentScanline == 144){
+        if (currentScanline == 144) {
             // We entered VBlank! Request CPU Interrupt Bit 0.
-            requestVBlankInterrupt();
-        }
-        else if (currentScanline > 153){
+            requestVBlankInterrupt(); 
+
+            // --- TEMPORARY: GENERATE STATIC NOISE ---
+            // Fill the frame buffer with random grayscale values
+            for (int i = 0; i < 160 * 144; ++i) {
+                uint8_t noise = rand() % 256;
+                // Format is ARGB (0xAARRGGBB). Alpha must be 0xFF (fully opaque).
+                frameBuffer[i] = 0xFF000000 | (noise << 16) | (noise << 8) | noise;
+            }
+            
+            // Tell the main loop it is time to render!
+            frameReady = true; 
+
+        } else if (currentScanline > 153) {
             // Back to the top of the screen
             currentScanline = 0;
             memory.write(0xFF44, 0);
@@ -28,34 +36,26 @@ void PPU::step(int cycles){
     }
 
     // --- State Machine ---
-    if (currentScanline >= 144){
+    if (currentScanline >= 144) {
         setMode(1); // Mode 1: VBlank
-    }
-    else{
-        if (scanlineCounter < 80){
+    } else {
+        if (scanlineCounter < 80) {
             setMode(2); // Mode 2: OAM Search (Sprites)
-        }
-        else if (scanlineCounter < 252){
+        } else if (scanlineCounter < 252) {
             setMode(3); // Mode 3: Pixel Transfer
-        }
-        else{
+        } else {
             setMode(0); // Mode 0: HBlank
-
-            // (Optional: Draw the current scanline to your screen buffer here)
         }
     }
 }
 
-void PPU::setMode(uint8_t mode){
+void PPU::setMode(uint8_t mode) {
     uint8_t stat = memory.read(0xFF41);
-
     stat = (stat & ~0x03) | mode;
-
     memory.write(0xFF41, stat);
 }
 
-void PPU::requestVBlankInterrupt(){
+void PPU::requestVBlankInterrupt() {
     uint8_t flag = memory.read(0xFF0F);
-
     memory.write(0xFF0F, flag | 0x01); // Set bit 0
 }
