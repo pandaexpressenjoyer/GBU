@@ -4,29 +4,24 @@
 #include <cstdint>
 #include "Memory.h"
 
-#define CLK_FREQ 4194304 // in Hz
-#define DIV 0xFF04
-#define TIMA 0xFF05
-#define TMA 0xFF06
-#define TAC 0xFF07
-
 class CPU{
     public:
         CPU(Memory& mem);
+
+        bool halted = false;
+        bool stopped = false;
+
         int step();
         void reset();
 
-        void updateTimers(int cycles);
         void requestInterrupt(int interruptBit);
         void handleInterrupts();
         
     private:
         Memory& memory;
-
-        int divCounter = 0;
-        int timerCounter = 0;
+        
         bool ime = false; // interrupt master enable flag
-
+        
         union{
             struct{
                 uint8_t f; // flags register
@@ -50,8 +45,8 @@ class CPU{
         };
         union{
             struct{
-                uint8_t h; 
                 uint8_t l; 
+                uint8_t h; 
             };
             uint16_t hl;
         };
@@ -64,7 +59,7 @@ class CPU{
         uint16_t fetchWord();
         
         int executeOpcode(uint8_t opcode); 
-        int executeCB(uint8_t cbOpcode); // <--- Added CB declaration
+        int executeCB(uint8_t cbOpcode); 
 };
 
 #endif

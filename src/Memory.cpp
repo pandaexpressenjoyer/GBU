@@ -37,8 +37,15 @@ uint8_t Memory::readIO(uint16_t address) const{
 }
 
 void Memory::writeIO(uint16_t address, uint8_t value){
-    // Route Timer Registers
-    if (address >= 0xFF04 && address <= 0xFF07) { timer.write(address, value); return; }
+    // --- ADDED: The DIV Intercept ---
+    if (address == 0xFF04) {
+        // Force the value to 0 to mimic hardware resetting
+        timer.write(0xFF04, 0); 
+        return;
+    }
+
+    // Route remaining Timer Registers (TIMA, TMA, TAC)
+    if (address >= 0xFF05 && address <= 0xFF07) { timer.write(address, value); return; }
     
     if (address == 0xFF01) { printf("%c", value); }
     

@@ -12,15 +12,21 @@ const int GB_HEIGHT = 144;
 const int SCALE = 4; // Scale the window 4x so it's easily visible
 
 int main(int argc, char* argv[]) {
+    // --- ADDED: Dynamic ROM Loading ---
+    if (argc < 2) {
+        std::cerr << "Error: No ROM file specified!" << std::endl;
+        std::cerr << "Usage: " << argv[0] << " <path_to_rom.gb>" << std::endl;
+        return 1; 
+    }
+
     // 1. Initialize Hardware Bus
     Controller joypad;
     Memory bus(joypad);
     CPU cpu(bus);
     PPU ppu(bus);
 
-    // 2. Load the test ROM
-    // Make sure 'cpu_instrs.gb' is in the same directory as your executable
-    if (!bus.load("cpu_instrs.gb")) {
+    // 2. Load the ROM passed from the terminal
+    if (!bus.load(argv[1])) {
         std::cerr << "Failed to load ROM! Check the file path." << std::endl;
         return 1;
     }
@@ -89,13 +95,31 @@ int main(int argc, char* argv[]) {
             }
         }
 
+        // --- ADDED: The CPU Wake-Up Check ---
+        if (cpu.halted) {
+            uint8_t ie = bus.read(0xFFFF);   // Interrupt Enable Register
+            uint8_t iflag = bus.read(0xFF0F); // Interrupt Flag Register
+            
+            if ((ie & iflag & 0x1F) != 0) {
+                cpu.halted = false; // An interrupt is pending, wake up!
+            }
+        }
+
         // --- Hardware Stepping ---
-        // Step the CPU and get how many clock cycles the instruction took
-        int cycles = cpu.step();
+        int cycles = 0;
+        
+        // --- ADDED: HALT Cycle Logic ---
+        if (!cpu.halted) {
+            // CPU is awake, fetch and execute the next instruction
+            cycles = cpu.step();
+        } else {
+            // CPU is asleep. Consume 4 cycles to keep the system clocks ticking
+            cycles = 4;
+        }
         
         // Step the PPU and Timers to keep them in sync with the CPU
         ppu.step(cycles);
-        bus.timer.step(cycles); // <-- ADDED: Step the hardware timers
+        bus.timer.step(cycles); 
 
         // --- Graphics Rendering ---
         // Only draw to the screen if the PPU has finished a full frame (VBlank)
